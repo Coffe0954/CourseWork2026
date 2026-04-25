@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <stdexcept>
 
 class Pager {
 public:
@@ -11,7 +12,6 @@ public:
     Pager(const std::string& filename);
     ~Pager();
 
-    //чтение/запись страницы по номеру
     void write_page(uint32_t page_id, const std::vector<uint8_t>& data);
     std::vector<uint8_t> read_page(uint32_t page_id);
 
