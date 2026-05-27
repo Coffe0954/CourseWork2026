@@ -1,33 +1,87 @@
+#include "dbms.h"
+#include "logger.h"
+#include "parser.h"
+#include "runner.h"
+#include "utils.h"
+
 #include <iostream>
 #include <string>
-#include <fstream>
-#include "storage/Pager.hpp"
 
-void run_interactive_mode() {
-    std::string command;
-    while (true) {
-        std::cout << "dbms> ";
-        if (!std::getline(std::cin, command) || command == "exit") break;
-        //����� ���������� SQLParser::parse(command)
+// Интерактивный режим
+
+static void interactiveMode(DBMS& dbms, Parser& parser, Logger& logger)
+{
+    std::cout << "Учебная СУБД запущена" << std::endl;
+    std::cout << "Введите EXIT; или QUIT; для выхода" << std::endl;
+
+    std::string buffer;
+    std::string line;
+
+    while (true)
+    {
+        if (buffer.empty()) std::cout << "> ";
+        else std::cout << ". ";
+
+        if (!std::getline(std::cin, line))
+        {
+            break;
+        }
+
+        buffer += line;
+        buffer += '\n';
+
+        std::string upper = toUpper(trim(buffer));
+        if (upper == "EXIT;" || upper == "QUIT;")
+        {
+            break;
+        }
+
+        try
+        {
+            std::vector<std::string> statements = splitStatements(buffer);
+            if (!statements.empty())
+            {
+                std::cout << executeText(dbms, parser, logger, buffer, "terminal", "main") << std::flush;
+                buffer.clear();
+            }
+        }
+        catch (const std::exception&)
+        {
+            // ! команда ещё может быть не завершена символом ";", ждём следующую строку
+        }
     }
 }
 
-void run_batch_mode(const std::string& filename) {
-    std::ifstream script(filename);
-    std::string command;
-    while (std::getline(script, command)) {
-        //���������� ������ �� �����
-    }
-}
+int main(int argc, char* argv[])
+{
+    try
+    {
+        DBMS dbms("data");
+        Parser parser;
+        Logger logger("logs");
 
-int main(int argc, char* argv[]) {
-    if (argc == 1) {
-        run_interactive_mode();
-    } else if (argc == 2) {
-        run_batch_mode(argv[1]);
-    } else {
-        std::cerr << "Usage: " << argv[0] << " [script.txt]" << std::endl;
+        if (argc == 1)
+        {
+            interactiveMode(dbms, parser, logger);
+            return 0;
+        }
+
+        // Пакетный режим, чтение файла
+        if (argc == 2)
+        {
+            std::string text = readWholeFile(argv[1]);
+            std::cout << executeText(dbms, parser, logger, text, "script", "main") << std::flush;
+            return 0;
+        }
+
+        std::cerr << "Использование:" << std::endl;
+        std::cerr << "./course_work" << std::endl;
+        std::cerr << "./course_work script.sql" << std::endl;
         return 1;
     }
-    return 0;
+    catch (const std::exception& error)
+    {
+        std::cerr << "Критическая ошибка: " << error.what() << std::endl;
+        return 1;
+    }
 }

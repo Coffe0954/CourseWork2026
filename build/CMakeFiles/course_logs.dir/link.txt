@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/course_logs.dir/link.d CMakeFiles/course_logs.dir/src/logviewer.cpp.o CMakeFiles/course_logs.dir/src/securefile.cpp.o CMakeFiles/course_logs.dir/src/utils.cpp.o CMakeFiles/course_logs.dir/course_storage.pb.cc.o -o course_logs  /usr/lib/x86_64-linux-gnu/libprotobuf.so -lpthread
