@@ -186,7 +186,7 @@ void Lexer::expectWord(const std::string& text)
     // Проверка, является ли токен словом и совпадает ли его текст без учета регистра
     if (peek().type != TokenType::Word || toUpper(peek().text) != toUpper(text))
     {
-        throw std::runtime_error("ожидалось ключевое слово '" + text + "', но получено '" + peek().text + "'"); // Выброс исключения
+        throw std::runtime_error("ожидался ввод '" + text + "', но было введено '" + peek().text + "'"); // Выброс исключения
     }
     ++position_; // Продвижение позиции после валидации слова
 }
