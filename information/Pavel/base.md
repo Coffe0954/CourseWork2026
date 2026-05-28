@@ -23,3 +23,13 @@ lexer.cpp / Lexer::Lexer()
 ```
 utils.cpp / isValidIdentifier()
 ```
+
+### 5. Обращение к таблицам: database_name.table_name или через USE
+```
+Реализация: parser.cpp Parser::parseTableName()
+Использование: dbms.cpp 
+        resolveDataBaseName() - выбирает способ открытия таблицы
+        requireDataBaseFromTableName() - открывает нужную базу данных
+
+USE реализовано в dbms.cpp / DBMS::executeUseDatabase()
+```
