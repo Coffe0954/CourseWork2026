@@ -14,3 +14,12 @@ lexer.cpp / consumeIf(), expectWords()
 parser.cpp / все проверки ключевых слов
 ```
 
+### 3. Строковые литералы заключаются в двойные кавычки (")
+```
+lexer.cpp / Lexer::Lexer()
+```
+
+### 4. Правила имён сущностей (БД, таблиц, колонок)
+```
+utils.cpp / isValidIdentifier()
+```
