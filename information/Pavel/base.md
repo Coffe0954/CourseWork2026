@@ -33,3 +33,36 @@ utils.cpp / isValidIdentifier()
 
 USE реализовано в dbms.cpp / DBMS::executeUseDatabase()
 ```
+
+**Общая схема обработки SQL-текста**
+```
+Многострочный текст
+    ↓
+splitStatements()                  // utils.cpp
+    ↓
+Lexer (токенизация)                // lexer.cpp
+    ↓
+Parser::parseStatement()           // parser.cpp
+    ↓
+DBMS::execute()                    // dbms.cpp
+    ↓
+Table / Database / Auth и т.д.
+```
+
+## 2. Работа с метаданными СУБД
+
+## 1. Парсинг команд
+
+```
+parser.cpp / Parser::parseStatement()
+```
+
+## 2. Диспетчеризация выполнения
+```
+dbms.cpp / DBMS::execute()
+```
+
+## 3. Основная реализация
+```
+
+```

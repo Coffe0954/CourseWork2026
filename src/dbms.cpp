@@ -98,18 +98,18 @@ std::string DBMS::executeCreateDatabase(const CreateDatabaseCommand& command)
     // Проверка имени базы данных на соответствие правилам идентификаторов
     if (!isValidIdentifier(command.databaseName))
     {
-        throw std::runtime_error("некорректное имя базы данных: " + command.databaseName); // Ошибка валидации имени
+        throw std::runtime_error("Некорректное имя базы данных: " + command.databaseName); // Ошибка валидации имени
     }
 
     std::filesystem::path path = databasePath(command.databaseName); // Получение пути для новой папки БД
     // Если папка с таким именем уже физически существует
     if (std::filesystem::exists(path))
     {
-        throw std::runtime_error("база данных уже существует: " + command.databaseName); // Ошибка дублирования БД
+        throw std::runtime_error("База данных уже существует: " + command.databaseName); // Ошибка дублирования БД
     }
 
     std::filesystem::create_directories(path); // Создание директории для файлов новой БД
-    return "OK: база данных создана: " + command.databaseName; // Возврат успешного статуса операции
+    return "\033[32m✓\033[0m База данных успешно создана: " + command.databaseName; // Возврат успешного статуса операции
 }
 
 // Выполнение команды удаления базы данных со всем содержимым
@@ -120,7 +120,7 @@ std::string DBMS::executeDropDatabase(const DropDatabaseCommand& command)
     // Если директория базы данных не найдена
     if (!std::filesystem::exists(path))
     {
-        throw std::runtime_error("база данных не существует: " + command.databaseName); // Ошибка удаления отсутствующей БД
+        throw std::runtime_error("База данных не существует: " + command.databaseName); // Ошибка удаления отсутствующей БД
     }
 
     std::filesystem::remove_all(path); // Рекурсивное физическое удаление папки со всеми таблицами
@@ -130,7 +130,7 @@ std::string DBMS::executeDropDatabase(const DropDatabaseCommand& command)
         currentDatabase_.clear(); // Сброс контекста активной базы данных
     }
 
-    return "OK: база данных удалена: " + command.databaseName; // Возврат статуса об успешном удалении
+    return "\033[32m✓\033[0m База данных успешно удалена: " + command.databaseName; // Возврат статуса об успешном удалении
 }
 
 // Выполнение команды USE для переключения контекста на указанную БД
@@ -140,11 +140,11 @@ std::string DBMS::executeUseDatabase(const UseDatabaseCommand& command)
     // Проверка физического существования папки переключаемой БД
     if (!std::filesystem::exists(databasePath(command.databaseName)))
     {
-        throw std::runtime_error("база данных не существует: " + command.databaseName); // Ошибка: база не найдена
+        throw std::runtime_error("База данных не существует: " + command.databaseName); 
     }
 
     currentDatabase_ = command.databaseName; // Фиксация нового имени активной базы данных в СУБД
-    return "OK: выбрана база данных: " + currentDatabase_; // Подтверждение успешного переключения контекста
+    return "\033[32m✓\033[0m Выбрана база данных: " + currentDatabase_; // Подтверждение успешного переключения контекста
 }
 
 // Выполнение команды создания таблицы в активной базе данных
@@ -159,7 +159,7 @@ std::string DBMS::executeCreateTable(const CreateTableCommand& command)
     std::lock_guard<std::mutex> lock(tableMutexForKey(makeTableLockKey(currentDatabase_, command.tableName))); // Блокировка целевой таблицы
     Database database(databasePath(currentDatabase_)); // Инициализация объекта текущей БД
     database.createTable(command.tableName, command.columns); // Создание схемы и файлов новой таблицы
-    return "OK: таблица создана: " + command.tableName; // Подтверждение успешного создания таблицы
+    return "\033[32m✓\033[0m Таблица успешно создана: " + command.tableName; // Подтверждение успешного создания таблицы
 }
 
 // Выполнение команды удаления таблицы
@@ -169,7 +169,7 @@ std::string DBMS::executeDropTable(const DropTableCommand& command)
     std::lock_guard<std::mutex> lock(tableMutexForKey(makeTableLockKey(databaseName, command.table.tableName))); // Эксклюзивная блокировка таблицы
     Database database(databasePath(databaseName)); // Инициализация объекта целевой БД
     database.dropTable(command.table); // Удаление таблицы из структуры базы данных
-    return "OK: таблица удалена: " + command.table.tableName; // Подтверждение успешного удаления таблицы
+    return "\033[32m✓\033[0m Таблица успешно удалена: " + command.table.tableName; // Подтверждение успешного удаления таблицы
 }
 
 // Выполнение команды вставки новых записей в таблицу
@@ -180,7 +180,7 @@ std::string DBMS::executeInsert(const InsertCommand& command)
     Database database(databasePath(databaseName)); // Открытие целевой БД
     Table table = database.openTable(command.table); // Открытие файлов целевой таблицы
     std::size_t count = table.insertRows(command.columns, command.rows); // Выполнение операции вставки и подсчет строк
-    return "OK: вставлено строк: " + std::to_string(count); // Возврат отчета о количестве добавленных записей
+    return "\033[32m✓\033[0m Вставлено строк: " + std::to_string(count); // Возврат отчета о количестве добавленных записей
 }
 
 // Выполнение команды обновления (модификации) существующих строк по условию
@@ -191,7 +191,7 @@ std::string DBMS::executeUpdate(const UpdateCommand& command)
     Database database(databasePath(databaseName)); // Открытие БД
     Table table = database.openTable(command.table); // Открытие таблицы
     std::size_t count = table.updateRows(command.assignments, command.where); // Модификация данных и возврат счетчика строк
-    return "OK: обновлено строк: " + std::to_string(count); // Возврат отчета о количестве измененных записей
+    return "\033[32m✓\033[0m Обновлено строк: " + std::to_string(count); // Возврат отчета о количестве измененных записей
 }
 
 // Выполнение команды удаления строк, соответствующих условию WHERE
@@ -202,7 +202,7 @@ std::string DBMS::executeDelete(const DeleteCommand& command)
     Database database(databasePath(databaseName)); // Открытие БД
     Table table = database.openTable(command.table); // Открытие таблицы
     std::size_t count = table.deleteRows(command.where); // Удаление записей с диска и возврат количества строк
-    return "OK: удалено строк: " + std::to_string(count); // Возврат отчета о количестве удаленных записей
+    return "\033[32m✓\033[0m. Удалено строк: " + std::to_string(count); // Возврат отчета о количестве удаленных записей
 }
 
 // Выполнение команды выборки (поиска) данных из таблицы

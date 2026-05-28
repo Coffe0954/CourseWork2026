@@ -4,13 +4,13 @@
 
 #include <stdexcept>
 
-// Главный метод разбора: преобразует исходный текст SQL-запроса в структуру команды
+// Преобразует исходный текст SQL-запроса в структуру команды
 Statement Parser::parseStatement(const std::string& text) const
 {
     std::string clean = trim(text); // Удаление начальных и конечных пробельных символов
     if (clean.empty())
     {
-        throw std::runtime_error("пустая команда"); // Ошибка при попытке распарсить пустую строку
+        throw std::runtime_error("Пустая команда"); // Ошибка при попытке распарсить пустую строку
     }
 
     if (!clean.empty() && clean.back() == ';')
@@ -23,7 +23,7 @@ Statement Parser::parseStatement(const std::string& text) const
 
     if (first.type != TokenType::Word)
     {
-        throw std::runtime_error("команда должна начинаться с ключевого слова"); // Защита от некорректного старта запроса
+        throw std::runtime_error("Команда должна начинаться с ключевого слова"); // Защита от некорректного старта запроса
     }
 
     std::string command = toUpper(first.text); // Приведение ключевого слова к верхнему регистру
@@ -31,11 +31,12 @@ Statement Parser::parseStatement(const std::string& text) const
 
     if (command == "CREATE")
     {
+        
         Token second = lexer.next(); // Получение типа создаваемой сущности
         std::string next = toUpper(second.text); // Приведение типа сущности к верхнему регистру
         if (next == "DATABASE") statement = CreateDatabaseCommand{parseIdentifier(lexer)}; // Разбор команды создания БД
         else if (next == "TABLE") statement = parseCreateTable(lexer); // Разбор команды создания таблицы
-        else throw std::runtime_error("неизвестная команда CREATE " + second.text); // Ошибка: создание не поддерживается
+        else throw std::runtime_error("Неизвестная команда CREATE " + second.text); // Ошибка: создание не поддерживается
     }
     else if (command == "DROP")
     {
@@ -43,7 +44,7 @@ Statement Parser::parseStatement(const std::string& text) const
         std::string next = toUpper(second.text); // Приведение типа сущности к верхнему регистру
         if (next == "DATABASE") statement = DropDatabaseCommand{parseIdentifier(lexer)}; // Разбор команды удаления БД
         else if (next == "TABLE") statement = DropTableCommand{parseTableName(lexer)}; // Разбор команды удаления таблицы
-        else throw std::runtime_error("неизвестная команда DROP " + second.text); // Ошибка: удаление не поддерживается
+        else throw std::runtime_error("Неизвестная команда DROP " + second.text); // Ошибка: удаление не поддерживается
     }
     else if (command == "USE")
     {
@@ -67,12 +68,12 @@ Statement Parser::parseStatement(const std::string& text) const
     }
     else
     {
-        throw std::runtime_error("неизвестная команда: " + command); // Ошибка при передаче неподдерживаемого слова
+        throw std::runtime_error("Неизвестная команда: " + command); // Ошибка при передаче неподдерживаемого слова
     }
 
     if (!lexer.isEnd())
     {
-        throw std::runtime_error("лишний токен в конце команды: " + lexer.peek().text); // Ошибка наличия мусора после ';'
+        throw std::runtime_error("Лишний токен в конце команды: " + lexer.peek().text); // Ошибка наличия мусора после ';'
     }
 
     return statement; // Возврат сформированного объекта команды
@@ -85,12 +86,12 @@ std::string Parser::parseIdentifier(Lexer& lexer) const
 
     if (token.type != TokenType::Word)
     {
-        throw std::runtime_error("ожидался идентификатор, но получено '" + token.text + "'"); // Ошибка: токен не является словом
+        throw std::runtime_error("Ожидался идентификатор, но получено '" + token.text + "'"); // Ошибка: токен не является словом
     }
 
     if (!isValidIdentifier(token.text))
     {
-        throw std::runtime_error("некорректный идентификатор: " + token.text); // Ошибка: имя нарушает правила синтаксиса
+        throw std::runtime_error("Некорректный идентификатор: " + token.text); // Ошибка: имя нарушает правила синтаксиса
     }
 
     return token.text; // Возврат валидного имени сущности
@@ -135,7 +136,7 @@ Value Parser::parseLiteral(Lexer& lexer) const
         return makeNull(); // Возврат инициализированного пустого значения
     }
 
-    throw std::runtime_error("ожидалась константа, но получено '" + token.text + "'"); // Ошибка: передан неподходящий токен
+    throw std::runtime_error("Ожидалась константа, но получено '" + token.text + "'"); // Ошибка: передан неподходящий токен
 }
 
 // Определение типа операнда (колонка или константный литерал) для выражений фильтрации
@@ -158,7 +159,7 @@ Operand Parser::parseOperand(Lexer& lexer) const
         return result; // Возврат операнда-колонки
     }
 
-    throw std::runtime_error("ожидался операнд в WHERE, но получено '" + token.text + "'"); // Ошибка: неподдерживаемый тип операнда
+    throw std::runtime_error("Ожидался операнд в WHERE, но получено '" + token.text + "'"); // Ошибка: неподдерживаемый тип операнда
 }
 
 // Преобразование текстового токена в перечисление операторов сравнения
@@ -173,7 +174,7 @@ CompareOp Parser::parseCompareOp(Lexer& lexer) const
     if (token.text == ">") return CompareOp::Greater; // Соответствие оператору "больше"
     if (token.text == ">=") return CompareOp::GreaterOrEq; // Соответствие оператору "больше или равно"
 
-    throw std::runtime_error("ожидался оператор сравнения, но получено '" + token.text + "'"); // Ошибка: недопустимый знак сравнения
+    throw std::runtime_error("Ожидался оператор сравнения, но получено '" + token.text + "'"); // Ошибка: недопустимый знак сравнения
 }
 
 // Точка входа для парсинга логических условий секции WHERE
@@ -365,13 +366,13 @@ InsertCommand Parser::parseInsert(Lexer& lexer) const
 
     if (lexer.peek().type != TokenType::Word)
     {
-        throw std::runtime_error("в INSERT ожидалось VALUE или VALUES"); // Ошибка: отсутствует декларация значений
+        throw std::runtime_error("В INSERT ожидалось VALUE или VALUES"); // Ошибка: отсутствует декларация значений
     }
 
     std::string word = toUpper(lexer.next().text); // Извлечение токена объявления блоков данных
     if (word != "VALUE" && word != "VALUES")
     {
-        throw std::runtime_error("в INSERT ожидалось VALUE или VALUES"); // Защита от синтаксических ошибок в названии ключевого слова
+        throw std::runtime_error("В INSERT ожидалось VALUE или VALUES"); // Защита от синтаксических ошибок в названии ключевого слова
     }
 
     command.rows.push_back(parseLiteralRow(lexer)); // Извлечение обязательного первого блока данных
@@ -455,7 +456,7 @@ SelectItem Parser::parseSelectItem(Lexer& lexer) const
     }
     else
     {
-        throw std::runtime_error("ожидался столбец или агрегатная функция в SELECT"); // Исключение: передан недопустимый токен
+        throw std::runtime_error("Ожидался столбец или агрегатная функция в SELECT"); // Исключение: передан недопустимый токен
     }
 
     if (lexer.peek().type == TokenType::Word && toUpper(lexer.peek().text) == "AS")
