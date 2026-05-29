@@ -114,3 +114,104 @@ dbms.cpp / DBMS::execute()
 ```
 table.cpp 
 CREATE_TABLE: Table::create()
+DROP TABLE: Table::drop()
+```
+**Вспомогательные компоненты**
+```
+storage.cpp / schemaToPhotoBytes() - сериализация схемы в photobuf
+storage.cpp / schemaFromPhotoBytes() - дессериализация
+table.cpp / loadSchema() + validateSchema() - загрузка и открытие схемы при открытии таблицы
+table.cpp / buildIndexes() - создание объектов DiskBStarIndex()
+table.cpp / persistIndexesFromRows() - перестройка индексов при необходимости
+```
+
+## 4. Манипулирование данными (DML)
+
+### 1. Парсинг команд
+```
+parser.cpp / 
+    INSERT: Parser::parseInsert()
+    UPDATE: Parser::parseUpdate()
+    DELETE: parseDelete()
+    SELECT: parseSelect() + parseSelectItem()
+```
+
+### 2. Диспетчеризация
+```
+dbms.cpp / DBMS::execute()
+```
+
+### 3. Основная реализация
+```
+table.cpp
+```
+
+### 4. Важные механизмы
+```
+Хранение строк: storage.cpp / rowToPhotoBytes() + rowFromPhotoBytes()
+Переиспользование места: tryWriteRowToFreeSlot() + appendDeletedOffset
+Индексы: diskbstarindex.cpp 
+Блокировка: tablelock.cpp - мьютекс на каждую таблицу
+Логирование: runner.cpp + logger.cpp  
+```
+
+
+## 5. Где и как реализованы условия выборки (WHERE condition)
+
+### 1. Парсинг условий
+```
+parser.cpp /
+    Parser::parseWhereExpression() - входная точка
+    parseOrExpression()
+    parseAndExpression()
+    parsePrimaryExpression()
+    parsePredicate()
+
+```
+
+### 2. Вычисление условий
+```
+table.cpp /
+    Table::rowMatches() - решаеТ. подходит ли строка под условие
+    Table::resolveOperand() - берёт значение из строки по имени столбца
+    Table::compareOperands() - сравнение реализовано здесь
+        для INT числвоое
+        для STRING - лексикографическое
+    
+```
+
+![alt text](image.png)
+
+
+
+### 3. Оптимизация через индексы
+```
+Файл: table.cpp
+Функции:
+    • tryUseIndex() (строки ~1020–1070) 
+    • tryUseIndexForCompare() 
+    • tryUseIndexForBetween() 
+Что поддерживается индексами:
+    • column = const 
+    • column > const, column >= const 
+    • column < const, column <= const 
+    • column BETWEEN const1 AND const2 
+```
+
+### 4. Валидация условий
+```
+table.cpp / validateCondition(const Expr& expr)
+```
+
+### 5. Общая схема обработки WHERE
+```
+SQL → Parser::parseWhereExpression() → Expr (AST)
+         ↓
+    DBMS::executeSelect/Update/Delete
+         ↓
+   Table::selectRows / updateRows / deleteRows
+         ↓
+   indexedCandidateOffsets() → попытка использовать индекс
+         ↓
+   rowMatches() для каждой строки (или отфильтрованных)
+```
