@@ -51,18 +51,52 @@ Table / Database / Auth и т.д.
 
 ## 2. Работа с метаданными СУБД
 
-## 1. Парсинг команд
+### 1. Парсинг команд
 
 ```
 parser.cpp / Parser::parseStatement()
 ```
 
-## 2. Диспетчеризация выполнения
+### 2. Диспетчеризация выполнения
 ```
 dbms.cpp / DBMS::execute()
 ```
 
-## 3. Основная реализация
+### 3. Основная реализация
+```
+dbms.cpp / DBMS::execute<название команды>
 ```
 
+### 4. Вспомогательные алгоритмы
 ```
+dbms.cpp /
+    databasePath() - формирует путь
+    resolveDataname() - определяет, какую базу использовать
+    requireDataFromTableName() - открывает базу данных для операций с таблицами
+    metadataMutex() - глобальный мьютекс
+```
+
+### 5. Поток выполнения (пример)
+```
+CREATE DATABASE testdb;
+SQL → Lexer → Parser::parseStatement() → CreateDatabaseCommand
+    → DBMS::execute() → executeCreateDatabase()
+        → metadataMutex()
+        → create_directories("data/testdb")
+        → "OK: база данных создана: testdb"
+
+USE testdb;
+→ Parser → UseDatabaseCommand
+    → DBMS::executeUseDatabase()
+        → currentDatabase_ = "testdb"
+
+DROP DATABASE testdb;
+→ Parser → DropDatabaseCommand
+    → DBMS::executeDropDatabase()
+        → remove_all("data/testdb")
+        → если нужно — сброс currentDatabase_
+```
+
+## 3. Работа со схемами данных (DDL)
+
+### 1. 

@@ -68,7 +68,7 @@ std::string DBMS::resolveDatabaseName(const TableName& table) const
 // Вспомогательный метод для получения объекта БД на основе структуры имени таблицы
 Database DBMS::requireDatabaseFromTableName(const TableName& table) const
 {
-    return Database(databasePath(resolveDatabaseName(table))); // Возврат проверенного объекта Database
+    return Database(databasePath(resolveDatabaseName(table))); 
 }
 
 // Генерация уникальной строки-ключа для блокировки конкретной таблицы в многопоточной среде
