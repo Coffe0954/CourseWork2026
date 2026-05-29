@@ -62,20 +62,20 @@ void Table::create(const std::filesystem::path& databasePath, const std::string&
     // Валидация имени таблицы на допустимые символы
     if (!isValidIdentifier(tableName))
     {
-        throw std::runtime_error("некорректное имя таблицы: " + tableName); // Исключение при запрещенных знаках
+        throw std::runtime_error("Некорректное имя таблицы: " + tableName); // Исключение при запрещенных знаках
     }
 
     // Запрет на создание пустой таблицы без метаданных
     if (columns.empty())
     {
-        throw std::runtime_error("таблица должна содержать хотя бы один столбец"); // Ошибка пустой схемы
+        throw std::runtime_error("Таблица должна содержать хотя бы один столбец"); // Ошибка пустой схемы
     }
 
     std::filesystem::path tablePath = databasePath / tableName; // Вычисление полной целевой папки таблицы
     // Защита от случайной перезаписи уже существующей таблицы
     if (std::filesystem::exists(tablePath))
     {
-        throw std::runtime_error("таблица уже существует: " + tableName); // Ошибка дублирования сущности
+        throw std::runtime_error("Таблица уже существует: " + tableName); // Ошибка дублирования сущности
     }
 
     ensureDirectoryExists(tablePath); // Физическое создание директории таблицы на диске
@@ -95,7 +95,7 @@ void Table::create(const std::filesystem::path& databasePath, const std::string&
         // Проверка на отсутствие дубликатов полей в рамках одной таблицы
         if (!names.insert(column.name).second)
         {
-            throw std::runtime_error("повтор имени столбца: " + column.name); // Ошибка повторения имени
+            throw std::runtime_error("Повтор имени столбца: " + column.name); // Ошибка повторения имени
         }
 
         // Логическое требование: индексируемые поля не могут принимать NULL
@@ -144,7 +144,7 @@ void Table::drop(const std::filesystem::path& databasePath, const std::string& t
     // Защита от удаления отсутствующего ресурса
     if (!std::filesystem::exists(tablePath))
     {
-        throw std::runtime_error("таблица не существует: " + tableName); // Ошибка удаления
+        throw std::runtime_error("Таблица не существует: " + tableName); // Ошибка удаления
     }
 
     std::filesystem::remove_all(tablePath); // Полное рекурсивное удаление папки с диска
@@ -157,7 +157,7 @@ Table::Table(const std::filesystem::path& databasePath, const std::string& table
     // Валидация физического присутствия таблицы перед инициализацией
     if (!std::filesystem::exists(tablePath_))
     {
-        throw std::runtime_error("таблица не существует: " + tableName_); // Ошибка инициализации объекта
+        throw std::runtime_error("Таблица не существует: " + tableName_); // Ошибка инициализации объекта
     }
 
     loadSchema(); // Выгрузка колонок из файла схемы
@@ -173,7 +173,7 @@ void Table::loadSchema()
     std::vector<std::string> records = readSecureRecords(schemaPath()); // Чтение блоков данных схемы
     if (records.empty())
     {
-        throw std::runtime_error("не удалось открыть schema.pb для таблицы " + tableName_); // Ошибка структуры файла
+        throw std::runtime_error("Не удалось открыть schema.pb для таблицы " + tableName_); // Ошибка структуры файла
     }
 
     columns_ = schemaFromProtoBytes(records[0]); // Десериализация структуры колонок из байтового потока Protobuf
@@ -185,7 +185,7 @@ void Table::validateSchema() const
     // Схема обязана содержать описания колонок
     if (columns_.empty())
     {
-        throw std::runtime_error("у таблицы пустая схема: " + tableName_); // Ошибка: таблица не имеет полей
+        throw std::runtime_error("У таблицы пустая схема: " + tableName_); // Ошибка: таблица не имеет полей
     }
 
     std::set<std::string> names; // Локальный набор контроля уникальности имен
@@ -197,12 +197,12 @@ void Table::validateSchema() const
 
         if (!isValidIdentifier(column.name))
         {
-            throw std::runtime_error("некорректное имя столбца в схеме: " + column.name); // Критическое имя в файле схемы
+            throw std::runtime_error("Некорректное имя столбца в схеме: " + column.name); // Критическое имя в файле схемы
         }
 
         if (!names.insert(column.name).second)
         {
-            throw std::runtime_error("повтор имени столбца в схеме: " + column.name); // Нарушение уникальности полей
+            throw std::runtime_error("Повтор имени столбца в схеме: " + column.name); // Нарушение уникальности полей
         }
 
         if (column.indexed && !column.notNull)
@@ -312,7 +312,7 @@ void Table::persistIndexesFromRows()
             // Вставка ключа и файлового смещения строки в B*-дерево с контролем уникальности
             if (!rebuiltIndexes[columnIndex]->insert(row[columnIndex], offset))
             {
-                throw std::runtime_error("повтор значения INDEXED-столбца: " + columns_[columnIndex].name); // Нарушение уникальности ключа индекса
+                throw std::runtime_error("Повтор значения INDEXED-столбца: " + columns_[columnIndex].name); // Нарушение уникальности ключа индекса
             }
         }
     }
@@ -360,7 +360,7 @@ std::size_t Table::findColumnIndex(const std::string& name) const
         }
     }
 
-    throw std::runtime_error("неизвестный столбец '" + name + "' в таблице " + tableName_); // Ошибка: поле отсутствует в схеме
+    throw std::runtime_error("Неизвестный столбец '" + name + "' в таблице " + tableName_); // Ошибка: поле отсутствует в схеме
 }
 
 // Проверка ячейки данных на ограничения NOT NULL и совместимость типов данных
@@ -371,7 +371,7 @@ void Table::validateValueForColumn(const Value& value, const ColumnInfo& column)
     {
         if (column.notNull)
         {
-            throw std::runtime_error("столбец '" + column.name + "' не может быть NULL"); // Запрет на запись NULL
+            throw std::runtime_error("Столбец '" + column.name + "' не может быть NULL"); // Запрет на запись NULL
         }
         return; // Корректно, если поле nullable
     }
@@ -379,7 +379,7 @@ void Table::validateValueForColumn(const Value& value, const ColumnInfo& column)
     // Проверка физической совместимости типа константы и типа поля
     if (!valueHasColumnType(value, column.type))
     {
-        throw std::runtime_error("неверный тип значения для столбца '" + column.name + "'"); // Несовпадение типов
+        throw std::runtime_error("Неверный тип значения для столбца '" + column.name + "'"); // Несовпадение типов
     }
 }
 
@@ -389,7 +389,7 @@ void Table::validateRow(const Row& row) const
     // Контроль соответствия количества переданных значений количеству полей таблицы
     if (row.size() != columns_.size())
     {
-        throw std::runtime_error("внутренняя ошибка: размер строки не совпадает со схемой"); // Критическая ошибка структуры данных
+        throw std::runtime_error("Внутренняя ошибка: размер строки не совпадает со схемой"); // Критическая ошибка структуры данных
     }
 
     // Поэлементная валидация каждой ячейки строки
@@ -456,7 +456,7 @@ void Table::validateCondition(const Expr& expr) const
             ColumnType rightType = operandType(expr.right); // Извлечение типа правого поля
             if (leftType != rightType)
             {
-                throw std::runtime_error("в WHERE сравниваются столбцы разных типов"); // Ошибка типизации логики
+                throw std::runtime_error("В WHERE сравниваются столбцы разных типов"); // Ошибка типизации логики
             }
         }
         // Случай Б: Сравнение колонки с константным литералом
@@ -467,7 +467,7 @@ void Table::validateCondition(const Expr& expr) const
             // Валидация соответствия типа константы типу поля, с которым она сравнивается
             if (literalOperand.literalValue.type != ValueType::Null && !valueHasColumnType(literalOperand.literalValue, columns_[findColumnIndex(columnOperand.columnName)].type))
             {
-                throw std::runtime_error("в WHERE константа имеет неверный тип"); // Ошибка типа константы
+                throw std::runtime_error("В WHERE константа имеет неверный тип"); // Ошибка типа константы
             }
         }
         return;
@@ -503,7 +503,7 @@ std::vector<Table::FreeSlot> Table::loadFreeSlots() const
         ProtoDeletedOffset proto; // Объект Protobuf для декодирования структуры
         if (!proto.ParseFromString(records[index]))
         {
-            throw std::runtime_error("не удалось прочитать free-list запись из deleted.pb"); // Ошибка повреждения файла удалений
+            throw std::runtime_error("Не удалось прочитать free-list запись из deleted.pb"); // Ошибка повреждения файла удалений
         }
 
         FreeSlot slot; // Локальная структура свободного слота
@@ -531,7 +531,7 @@ void Table::saveFreeSlots(const std::vector<FreeSlot>& slots) const
         std::string bytes; // Строковый буфер для сериализации
         if (!proto.SerializeToString(&bytes))
         {
-            throw std::runtime_error("не удалось сериализовать free-list запись deleted.pb"); // Исключение при сбое кодирования
+            throw std::runtime_error("Не удалось сериализовать free-list запись deleted.pb"); // Исключение при сбое кодирования
         }
 
         records.push_back(bytes); // Накопление байтовых строк для сохранения
@@ -674,7 +674,7 @@ void Table::appendRow(const Row& row)
 
         if (indexes_[columnIndex]->contains(row[columnIndex]))
         {
-            throw std::runtime_error("повтор значения для INDEXED-столбца: " + columns_[columnIndex].name); // Контроль уникальности ключа
+            throw std::runtime_error("Повтор значения для INDEXED-столбца: " + columns_[columnIndex].name); // Контроль уникальности ключа
         }
     }
 
@@ -729,14 +729,14 @@ void Table::rewriteRows(const std::vector<Row>& rows)
             {
                 if (!intValues.insert(value.intValue).second)
                 {
-                    throw std::runtime_error("повтор значения для INDEXED-столбца: " + columns_[columnIndex].name); // Обнаружен дубликат числа
+                    throw std::runtime_error("Повтор значения для INDEXED-столбца: " + columns_[columnIndex].name); // Обнаружен дубликат числа
                 }
             }
             else
             {
                 if (!stringValues.insert(*value.stringValue).second)
                 {
-                    throw std::runtime_error("повтор значения для INDEXED-столбца: " + columns_[columnIndex].name); // Обнаружен дубликат строки
+                    throw std::runtime_error("Повтор значения для INDEXED-столбца: " + columns_[columnIndex].name); // Обнаружен дубликат строки
                 }
             }
         }

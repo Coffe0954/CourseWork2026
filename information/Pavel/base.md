@@ -99,4 +99,18 @@ DROP DATABASE testdb;
 
 ## 3. Работа со схемами данных (DDL)
 
-### 1. 
+### 1. Парсинг команд
+```
+CREATE TABLE parser.cpp / Parser::parserCreateTable()
+DROP TABLE parser.cpp / Parse::parseStatement()
+```
+
+### 2. Диспетчеризация выполнения
+```
+dbms.cpp / DBMS::execute()
+```
+
+### 3. Основная реализация
+```
+table.cpp 
+CREATE_TABLE: Table::create()
