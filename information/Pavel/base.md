@@ -215,3 +215,69 @@ SQL → Parser::parseWhereExpression() → Expr (AST)
          ↓
    rowMatches() для каждой строки (или отфильтрованных)
 ```
+
+
+## 6. [[3]]
+
+### 1. Общая архитектура
+```
+course.cpp /
+```
+
+### 2. Серверная часть
+```
+Используется библиотека crow
+Извелекает токен Autorization.Bearer
+Выполняет токен через AuthManager::verifyToken()
+```
+
+### 3. Клиентская часть
+```
+sendRawHttp() - рчуная реализация HTTP клиента через сырыре сокеты
+makePostRequest() - формирует полноценнный HTTP POst запрос с заголовками
+```
+
+## 10. DEFAULT и CREATE TABLE
+```
+parser.cpp / 
+    parserCreateTable()
+
+```
+### 1. Хранение информации o DEFAULT
+```
+storage.cpp \
+    schemaToProtoBytes() - сериализует hasDefault()
+    schemaFromProtoBytes() - десериализация при загрузе тблицы
+```
+
+```
+table.cpp /
+    insertRows() - подставляет DEFAULT
+    create() / validateRow() - проверяет корректность
+```
+
+## [12]
+
+### 1. Парсинг агрегатных функций
+```
+parser.cpp \
+    parser::parseSelectItem()
+```
+
+### 2. Основная логика выполнения агрегатов
+```
+teble.cpp /
+    Table::selectRows()
+```
+
+### 3. Вычисление агрегатных функций
+```
+table.cpp /
+    Table::makea=AggregateJson()
+```
+
+### Вспомигательные функции
+```
+itemsContainAggregate() - проверяет, есть ли в SELECT хотя бы одна агрегатная функция
+defaultAgregateName() - формирует имя колонки в результате 
+```
