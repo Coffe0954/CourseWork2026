@@ -1,3 +1,4 @@
+
 #include "diskbstarindex.h"
 #include "securefile.h"
 #include "storage.h"
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <stdexcept>
 
+// Конструктор: инициализирует пути, тип ключа и проверяет файлы
 DiskBStarIndex::DiskBStarIndex(
     const std::filesystem::path& pageFilePath,
     const std::filesystem::path& metaFilePath,
@@ -17,6 +19,7 @@ DiskBStarIndex::DiskBStarIndex(
     ensureFilesExist();
 }
 
+// Создает файлы индекса и метаданных, если они отсутствуют
 void DiskBStarIndex::ensureFilesExist() const
 {
     if (!secureFileExists(pageFilePath_))
@@ -31,6 +34,7 @@ void DiskBStarIndex::ensureFilesExist() const
     }
 }
 
+// Полностью очищает индекс и перезаписывает файлы
 void DiskBStarIndex::clear()
 {
     std::vector<std::string> emptyPages;
@@ -39,6 +43,7 @@ void DiskBStarIndex::clear()
     saveHeader(header);
 }
 
+// Загружает и парсит заголовок метаданных из файла
 DiskBStarIndex::HeaderData DiskBStarIndex::loadHeader() const
 {
     ensureFilesExist();
@@ -56,11 +61,13 @@ DiskBStarIndex::HeaderData DiskBStarIndex::loadHeader() const
         throw std::runtime_error("не удалось прочитать meta-файл файлового B*-индекса");
     }
 
+    // Заполнение основных полей заголовка
     header.rootExists = proto.root_exists();
     header.rootPageId = proto.root_page_id();
     header.nextPageId = proto.next_page_id();
     header.size = proto.size();
 
+    // Загрузка карты расположения страниц на диске
     for (int index = 0; index < proto.locations_size(); ++index)
     {
         const ProtoBStarPageLocation& location = proto.locations(index);
@@ -70,6 +77,7 @@ DiskBStarIndex::HeaderData DiskBStarIndex::loadHeader() const
         header.locations[location.page_id()] = item;
     }
 
+    // Загрузка списка свободных слотов для повторного использования
     for (int index = 0; index < proto.free_slots_size(); ++index)
     {
         const ProtoBStarFreeSlot& slot = proto.free_slots(index);
@@ -82,6 +90,7 @@ DiskBStarIndex::HeaderData DiskBStarIndex::loadHeader() const
     return header;
 }
 
+// Сериализует и сохраняет заголовок метаданных в файл
 void DiskBStarIndex::saveHeader(const HeaderData& header) const
 {
     ProtoBStarDiskHeader proto;
@@ -90,6 +99,7 @@ void DiskBStarIndex::saveHeader(const HeaderData& header) const
     proto.set_next_page_id(header.nextPageId);
     proto.set_size(header.size);
 
+    // Сохранение расположения страниц
     for (std::map<long long, PageLocation>::const_iterator it = header.locations.begin(); it != header.locations.end(); ++it)
     {
         ProtoBStarPageLocation* location = proto.add_locations();
@@ -98,6 +108,7 @@ void DiskBStarIndex::saveHeader(const HeaderData& header) const
         location->set_size(static_cast<long long>(it->second.size));
     }
 
+    // Сохранение свободных слотов
     for (std::size_t index = 0; index < header.freeSlots.size(); ++index)
     {
         ProtoBStarFreeSlot* slot = proto.add_free_slots();
@@ -116,16 +127,18 @@ void DiskBStarIndex::saveHeader(const HeaderData& header) const
     writeSecureRecords(metaFilePath_, records);
 }
 
+// Создает и инициализирует новую структуру страницы
 ProtoBStarPage DiskBStarIndex::makePage(HeaderData& header, bool isLeaf) const
 {
     ProtoBStarPage page;
     page.set_page_id(header.nextPageId);
-    header.nextPageId += 1;
+    header.nextPageId += 1; // Инкремент счетчика ID страниц
     page.set_is_leaf(isLeaf);
     page.set_deleted(false);
     return page;
 }
 
+// Читает страницу с диска по ее ID и валидирует данные
 ProtoBStarPage DiskBStarIndex::readPage(const HeaderData& header, long long pageId) const
 {
     std::map<long long, PageLocation>::const_iterator found = header.locations.find(pageId);
@@ -149,6 +162,7 @@ ProtoBStarPage DiskBStarIndex::readPage(const HeaderData& header, long long page
     return page;
 }
 
+// Записывает страницу на диск, оптимизируя место через свободные слоты
 void DiskBStarIndex::writePage(HeaderData& header, const ProtoBStarPage& page) const
 {
     std::string bytes;
@@ -157,6 +171,7 @@ void DiskBStarIndex::writePage(HeaderData& header, const ProtoBStarPage& page) c
         throw std::runtime_error("не удалось сериализовать страницу файлового B*-индекса");
     }
 
+    // Попытка перезаписать страницу в ее текущий слот
     std::map<long long, PageLocation>::iterator current = header.locations.find(page.page_id());
     if (current != header.locations.end())
     {
@@ -165,10 +180,12 @@ void DiskBStarIndex::writePage(HeaderData& header, const ProtoBStarPage& page) c
             return;
         }
 
+        // Если не поместилась, старый слот освобождается
         header.freeSlots.push_back(FreeSlot{current->second.offset, current->second.size});
         header.locations.erase(current);
     }
 
+    // Поиск подходящего по размеру свободного слота среди удаленных
     for (std::size_t index = 0; index < header.freeSlots.size(); ++index)
     {
         if (overwriteSecureRecordInSlot(pageFilePath_, bytes, header.freeSlots[index].offset, header.freeSlots[index].size))
@@ -182,6 +199,7 @@ void DiskBStarIndex::writePage(HeaderData& header, const ProtoBStarPage& page) c
         }
     }
 
+    // Если слотов нет, данные дописываются в конец файла
     std::streamoff offset = 0;
     appendSecureRecord(pageFilePath_, bytes, &offset);
     PageLocation location;
@@ -190,6 +208,7 @@ void DiskBStarIndex::writePage(HeaderData& header, const ProtoBStarPage& page) c
     header.locations[page.page_id()] = location;
 }
 
+// Освобождает занятый страницей слот и переносит его в список свободных
 void DiskBStarIndex::freeOldPageSlot(HeaderData& header, long long pageId) const
 {
     std::map<long long, PageLocation>::iterator found = header.locations.find(pageId);
@@ -201,11 +220,13 @@ void DiskBStarIndex::freeOldPageSlot(HeaderData& header, long long pageId) const
     header.locations.erase(found);
 }
 
+// Преобразует ключ записи из Protobuf во внутренний формат Value
 Value DiskBStarIndex::entryKey(const ProtoIndexEntry& entry) const
 {
     return valueFromProto(entry.key(), keyType_);
 }
 
+// Создает Protobuf-объект записи индекса
 ProtoIndexEntry DiskBStarIndex::makeEntry(const Value& key, std::streamoff offset, bool deleted) const
 {
     ProtoIndexEntry entry;
@@ -215,12 +236,14 @@ ProtoIndexEntry DiskBStarIndex::makeEntry(const Value& key, std::streamoff offse
     return entry;
 }
 
+// Сравнивает переданный ключ с ключом из записи
 int DiskBStarIndex::compareKeyWithEntry(const Value& key, const ProtoIndexEntry& entry) const
 {
     Value right = entryKey(entry);
     return compareValues(key, right);
 }
 
+// Ищет позицию для вставки ключа в массив записей страницы (линейный поиск)
 int DiskBStarIndex::findEntryPosition(const ProtoBStarPage& page, const Value& key) const
 {
     int index = 0;
@@ -231,6 +254,7 @@ int DiskBStarIndex::findEntryPosition(const ProtoBStarPage& page, const Value& k
     return index;
 }
 
+// Копирует все записи страницы в std::vector
 std::vector<ProtoIndexEntry> DiskBStarIndex::pageEntries(const ProtoBStarPage& page) const
 {
     std::vector<ProtoIndexEntry> entries;
@@ -241,6 +265,7 @@ std::vector<ProtoIndexEntry> DiskBStarIndex::pageEntries(const ProtoBStarPage& p
     return entries;
 }
 
+// Копирует ID всех дочерних страниц в std::vector
 std::vector<long long> DiskBStarIndex::pageChildren(const ProtoBStarPage& page) const
 {
     std::vector<long long> children;
@@ -251,6 +276,7 @@ std::vector<long long> DiskBStarIndex::pageChildren(const ProtoBStarPage& page) 
     return children;
 }
 
+// Полностью заменяет записи в Protobuf-странице
 void DiskBStarIndex::replaceEntries(ProtoBStarPage& page, const std::vector<ProtoIndexEntry>& entries) const
 {
     page.clear_entries();
@@ -260,6 +286,7 @@ void DiskBStarIndex::replaceEntries(ProtoBStarPage& page, const std::vector<Prot
     }
 }
 
+// Полностью заменяет указатели на детей в Protobuf-странице
 void DiskBStarIndex::replaceChildren(ProtoBStarPage& page, const std::vector<long long>& children) const
 {
     page.clear_child_page_ids();
@@ -269,6 +296,7 @@ void DiskBStarIndex::replaceChildren(ProtoBStarPage& page, const std::vector<lon
     }
 }
 
+// Удаляет логически удаленные записи (tombstones) из листа для очистки места
 void DiskBStarIndex::compactLeafTombstones(ProtoBStarPage& page) const
 {
     if (!page.is_leaf())
@@ -287,11 +315,13 @@ void DiskBStarIndex::compactLeafTombstones(ProtoBStarPage& page) const
     replaceEntries(page, active);
 }
 
+// Рекурсивный поиск смещения данных по ключу внутри конкретной страницы
 std::optional<std::streamoff> DiskBStarIndex::findInPage(const HeaderData& header, long long pageId, const Value& key) const
 {
     ProtoBStarPage page = readPage(header, pageId);
     const int position = findEntryPosition(page, key);
 
+    // Ключ найден на текущей странице
     if (position < page.entries_size() && compareKeyWithEntry(key, page.entries(position)) == 0)
     {
         if (page.entries(position).deleted())
@@ -311,9 +341,11 @@ std::optional<std::streamoff> DiskBStarIndex::findInPage(const HeaderData& heade
         return std::nullopt;
     }
 
+    // Рекурсивный спуск к дочерней странице
     return findInPage(header, page.child_page_ids(position), key);
 }
 
+// Публичный метод поиска: загружает заголовок и запускает поиск от корня
 std::optional<std::streamoff> DiskBStarIndex::find(const Value& key) const
 {
     HeaderData header = loadHeader();
@@ -324,11 +356,13 @@ std::optional<std::streamoff> DiskBStarIndex::find(const Value& key) const
     return findInPage(header, header.rootPageId, key);
 }
 
+// Проверяет, существует ли активный ключ в индексе
 bool DiskBStarIndex::contains(const Value& key) const
 {
     return find(key).has_value();
 }
 
+// Перераспределяет элементы между переполненным узлом и его левым соседом
 bool DiskBStarIndex::redistributeWithLeftForInsert(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     if (childIndex <= 0)
@@ -343,6 +377,7 @@ bool DiskBStarIndex::redistributeWithLeftForInsert(HeaderData& header, ProtoBSta
         return false;
     }
 
+    // Сборка общего массива элементов (левый + разделитель из родителя + текущий)
     std::vector<ProtoIndexEntry> combined;
     std::vector<ProtoIndexEntry> leftEntries = pageEntries(left);
     std::vector<ProtoIndexEntry> childEntries = pageEntries(child);
@@ -354,12 +389,14 @@ bool DiskBStarIndex::redistributeWithLeftForInsert(HeaderData& header, ProtoBSta
     const int newLeftCount = remaining / 2;
     const int separatorIndex = newLeftCount;
 
+    // Равномерное деление элементов и обновление родительского разделителя
     std::vector<ProtoIndexEntry> newLeftEntries(combined.begin(), combined.begin() + newLeftCount);
     std::vector<ProtoIndexEntry> newChildEntries(combined.begin() + separatorIndex + 1, combined.end());
     replaceEntries(left, newLeftEntries);
     replaceEntries(child, newChildEntries);
     *parent.mutable_entries(childIndex - 1) = combined[separatorIndex];
 
+    // Перераспределение дочерних указателей для внутренних узлов
     if (!child.is_leaf())
     {
         std::vector<long long> combinedChildren;
@@ -379,6 +416,7 @@ bool DiskBStarIndex::redistributeWithLeftForInsert(HeaderData& header, ProtoBSta
     return true;
 }
 
+// Перераспределяет элементы между переполненным узлом и его правым соседом
 bool DiskBStarIndex::redistributeWithRightForInsert(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     if (childIndex + 1 >= parent.child_page_ids_size())
@@ -393,6 +431,7 @@ bool DiskBStarIndex::redistributeWithRightForInsert(HeaderData& header, ProtoBSt
         return false;
     }
 
+    // Сборка общего массива элементов (текущий + разделитель из родителя + правый)
     std::vector<ProtoIndexEntry> combined;
     std::vector<ProtoIndexEntry> childEntries = pageEntries(child);
     std::vector<ProtoIndexEntry> rightEntries = pageEntries(right);
@@ -404,12 +443,14 @@ bool DiskBStarIndex::redistributeWithRightForInsert(HeaderData& header, ProtoBSt
     const int newChildCount = remaining / 2;
     const int separatorIndex = newChildCount;
 
+    // Равномерное деление элементов и обновление родительского разделителя
     std::vector<ProtoIndexEntry> newChildEntries(combined.begin(), combined.begin() + newChildCount);
     std::vector<ProtoIndexEntry> newRightEntries(combined.begin() + separatorIndex + 1, combined.end());
     replaceEntries(child, newChildEntries);
     replaceEntries(right, newRightEntries);
     *parent.mutable_entries(childIndex) = combined[separatorIndex];
 
+    // Перераспределение дочерних указателей для внутренних узлов
     if (!child.is_leaf())
     {
         std::vector<long long> combinedChildren;
@@ -429,6 +470,7 @@ bool DiskBStarIndex::redistributeWithRightForInsert(HeaderData& header, ProtoBSt
     return true;
 }
 
+// Сплит B*-дерева: превращает 2 переполненных узла (левый + текущий) в 3 заполненных на 2/3
 bool DiskBStarIndex::splitTwoToThreeWithLeft(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     if (childIndex <= 0)
@@ -450,6 +492,7 @@ bool DiskBStarIndex::splitTwoToThreeWithLeft(HeaderData& header, ProtoBStarPage&
     combined.push_back(parent.entries(childIndex - 1));
     combined.insert(combined.end(), childEntries.begin(), childEntries.end());
 
+    // Расчет пропорций деления на 3 части и 2 разделителя
     const int total = static_cast<int>(combined.size());
     const int remaining = total - 2;
     const int leftCount = remaining / 3;
@@ -457,6 +500,7 @@ bool DiskBStarIndex::splitTwoToThreeWithLeft(HeaderData& header, ProtoBStarPage&
     const int firstSeparator = leftCount;
     const int secondSeparator = leftCount + 1 + middleCount;
 
+    // Создание новой (средней) страницы и распределение элементов
     ProtoBStarPage middle = makePage(header, child.is_leaf());
     std::vector<ProtoIndexEntry> newLeftEntries(combined.begin(), combined.begin() + leftCount);
     std::vector<ProtoIndexEntry> middleEntries(combined.begin() + firstSeparator + 1, combined.begin() + secondSeparator);
@@ -466,6 +510,7 @@ bool DiskBStarIndex::splitTwoToThreeWithLeft(HeaderData& header, ProtoBStarPage&
     replaceEntries(middle, middleEntries);
     replaceEntries(child, newChildEntries);
 
+    // Распределение дочерних указателей между тремя новыми узлами
     if (!child.is_leaf())
     {
         std::vector<long long> combinedChildren;
@@ -482,6 +527,7 @@ bool DiskBStarIndex::splitTwoToThreeWithLeft(HeaderData& header, ProtoBStarPage&
         replaceChildren(child, newChildChildren);
     }
 
+    // Инъекция двух новых разделителей и ссылки на middle-страницу в родительский узел
     std::vector<ProtoIndexEntry> parentEntries = pageEntries(parent);
     std::vector<long long> parentChildren = pageChildren(parent);
     parentEntries[childIndex - 1] = combined[firstSeparator];
@@ -496,6 +542,7 @@ bool DiskBStarIndex::splitTwoToThreeWithLeft(HeaderData& header, ProtoBStarPage&
     return true;
 }
 
+// Сплит B*-дерева: превращает 2 переполненных узла (текущий + правый) в 3 заполненных на 2/3
 bool DiskBStarIndex::splitTwoToThreeWithRight(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     if (childIndex + 1 >= parent.child_page_ids_size())
@@ -517,6 +564,7 @@ bool DiskBStarIndex::splitTwoToThreeWithRight(HeaderData& header, ProtoBStarPage
     combined.push_back(parent.entries(childIndex));
     combined.insert(combined.end(), rightEntries.begin(), rightEntries.end());
 
+    // Расчет пропорций деления на 3 части и 2 разделителя
     const int total = static_cast<int>(combined.size());
     const int remaining = total - 2;
     const int leftCount = remaining / 3;
@@ -524,6 +572,7 @@ bool DiskBStarIndex::splitTwoToThreeWithRight(HeaderData& header, ProtoBStarPage
     const int firstSeparator = leftCount;
     const int secondSeparator = leftCount + 1 + middleCount;
 
+    // Создание новой (средней) страницы и распределение элементов
     ProtoBStarPage middle = makePage(header, child.is_leaf());
     std::vector<ProtoIndexEntry> newChildEntries(combined.begin(), combined.begin() + leftCount);
     std::vector<ProtoIndexEntry> middleEntries(combined.begin() + firstSeparator + 1, combined.begin() + secondSeparator);
@@ -533,6 +582,7 @@ bool DiskBStarIndex::splitTwoToThreeWithRight(HeaderData& header, ProtoBStarPage
     replaceEntries(middle, middleEntries);
     replaceEntries(right, newRightEntries);
 
+    // Распределение дочерних указателей между тремя новыми узлами
     if (!child.is_leaf())
     {
         std::vector<long long> combinedChildren;
@@ -549,6 +599,7 @@ bool DiskBStarIndex::splitTwoToThreeWithRight(HeaderData& header, ProtoBStarPage
         replaceChildren(right, newRightChildren);
     }
 
+    // Инъекция двух новых разделителей и ссылки на middle-страницу в родительский узел
     std::vector<ProtoIndexEntry> parentEntries = pageEntries(parent);
     std::vector<long long> parentChildren = pageChildren(parent);
     parentEntries[childIndex] = combined[firstSeparator];
@@ -563,10 +614,11 @@ bool DiskBStarIndex::splitTwoToThreeWithRight(HeaderData& header, ProtoBStarPage
     return true;
 }
 
+// Подготавливает дочерний узел к вставке, балансируя его при переполнении
 bool DiskBStarIndex::prepareChildForInsert(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     ProtoBStarPage child = readPage(header, parent.child_page_ids(childIndex));
-    compactLeafTombstones(child);
+    compactLeafTombstones(child); // Очистка удаленных записей перед проверкой размера
     writePage(header, child);
 
     if (child.entries_size() < kMaxEntries)
@@ -574,15 +626,25 @@ bool DiskBStarIndex::prepareChildForInsert(HeaderData& header, ProtoBStarPage& p
         return false;
     }
 
+    // Каскад стратегий балансировки B*-дерева (сначала перераспределение, потом сплит)
     if (redistributeWithLeftForInsert(header, parent, childIndex)) return true;
     if (redistributeWithRightForInsert(header, parent, childIndex)) return true;
     if (splitTwoToThreeWithLeft(header, parent, childIndex)) return true;
     if (splitTwoToThreeWithRight(header, parent, childIndex)) return true;
 
+    // Классический сплит 1-в-2, если продвинутые B* стратегии не применимы
     splitChild(header, parent, childIndex);
     return true;
 }
 
+
+
+
+
+
+
+
+// Классический сплит 1-в-2: делит переполненный узел по медиане на два
 void DiskBStarIndex::splitChild(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     ProtoBStarPage child = readPage(header, parent.child_page_ids(childIndex));
@@ -594,11 +656,13 @@ void DiskBStarIndex::splitChild(HeaderData& header, ProtoBStarPage& parent, int 
 
     ProtoBStarPage right = makePage(header, child.is_leaf());
 
+    // Распределение элементов между левой и новой правой страницами
     std::vector<ProtoIndexEntry> leftEntries(childEntries.begin(), childEntries.begin() + medianIndex);
     std::vector<ProtoIndexEntry> rightEntries(childEntries.begin() + medianIndex + 1, childEntries.end());
     replaceEntries(child, leftEntries);
     replaceEntries(right, rightEntries);
 
+    // Распределение дочерних указателей для внутренних узлов
     if (!child.is_leaf())
     {
         std::vector<long long> leftChildren(childChildren.begin(), childChildren.begin() + kMinDegree);
@@ -607,6 +671,7 @@ void DiskBStarIndex::splitChild(HeaderData& header, ProtoBStarPage& parent, int 
         replaceChildren(right, rightChildren);
     }
 
+    // Вставка медианы и ссылки на новую страницу в родительский узел
     std::vector<ProtoIndexEntry> parentEntries = pageEntries(parent);
     std::vector<long long> parentChildren = pageChildren(parent);
     parentEntries.insert(parentEntries.begin() + childIndex, median);
@@ -618,6 +683,7 @@ void DiskBStarIndex::splitChild(HeaderData& header, ProtoBStarPage& parent, int 
     writePage(header, right);
 }
 
+// Балансировка после удаления: заимствует/перераспределяет элементы из левого соседа
 bool DiskBStarIndex::borrowFromLeftAfterErase(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     if (childIndex <= 0)
@@ -635,6 +701,7 @@ bool DiskBStarIndex::borrowFromLeftAfterErase(HeaderData& header, ProtoBStarPage
         return false;
     }
 
+    // Объединение элементов левого соседа, разделителя и текущего узла
     std::vector<ProtoIndexEntry> combined;
     std::vector<ProtoIndexEntry> leftEntries = pageEntries(left);
     std::vector<ProtoIndexEntry> childEntries = pageEntries(child);
@@ -646,10 +713,12 @@ bool DiskBStarIndex::borrowFromLeftAfterErase(HeaderData& header, ProtoBStarPage
     const int newLeftCount = remaining / 2;
     const int separatorIndex = newLeftCount;
 
+    // Выравнивание количества элементов и обновление родителя
     replaceEntries(left, std::vector<ProtoIndexEntry>(combined.begin(), combined.begin() + newLeftCount));
     replaceEntries(child, std::vector<ProtoIndexEntry>(combined.begin() + separatorIndex + 1, combined.end()));
     *parent.mutable_entries(childIndex - 1) = combined[separatorIndex];
 
+    // Перенос дочерних указателей для внутренних узлов
     if (!child.is_leaf())
     {
         std::vector<long long> combinedChildren;
@@ -666,6 +735,7 @@ bool DiskBStarIndex::borrowFromLeftAfterErase(HeaderData& header, ProtoBStarPage
     return true;
 }
 
+// Балансировка после удаления: заимствует/перераспределяет элементы из правого соседа
 bool DiskBStarIndex::borrowFromRightAfterErase(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     if (childIndex + 1 >= parent.child_page_ids_size())
@@ -683,6 +753,7 @@ bool DiskBStarIndex::borrowFromRightAfterErase(HeaderData& header, ProtoBStarPag
         return false;
     }
 
+    // Объединение элементов текущего узла, разделителя и правого соседа
     std::vector<ProtoIndexEntry> combined;
     std::vector<ProtoIndexEntry> childEntries = pageEntries(child);
     std::vector<ProtoIndexEntry> rightEntries = pageEntries(right);
@@ -694,10 +765,12 @@ bool DiskBStarIndex::borrowFromRightAfterErase(HeaderData& header, ProtoBStarPag
     const int newChildCount = remaining / 2;
     const int separatorIndex = newChildCount;
 
+    // Выравнивание количества элементов и обновление родителя
     replaceEntries(child, std::vector<ProtoIndexEntry>(combined.begin(), combined.begin() + newChildCount));
     replaceEntries(right, std::vector<ProtoIndexEntry>(combined.begin() + separatorIndex + 1, combined.end()));
     *parent.mutable_entries(childIndex) = combined[separatorIndex];
 
+    // Перенос дочерних указателей для внутренних узлов
     if (!child.is_leaf())
     {
         std::vector<long long> combinedChildren;
@@ -714,6 +787,7 @@ bool DiskBStarIndex::borrowFromRightAfterErase(HeaderData& header, ProtoBStarPag
     return true;
 }
 
+// Слияние B*-дерева: объединяет 3 полупустых узла в 2 заполненных
 bool DiskBStarIndex::mergeThreeToTwoAfterErase(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     if (childIndex <= 0 || childIndex + 1 >= parent.child_page_ids_size())
@@ -733,6 +807,7 @@ bool DiskBStarIndex::mergeThreeToTwoAfterErase(HeaderData& header, ProtoBStarPag
         return false;
     }
 
+    // Сборка всех элементов из трех узлов и двух родительских разделителей
     std::vector<ProtoIndexEntry> combined;
     std::vector<ProtoIndexEntry> leftEntries = pageEntries(left);
     std::vector<ProtoIndexEntry> middleEntries = pageEntries(middle);
@@ -745,16 +820,18 @@ bool DiskBStarIndex::mergeThreeToTwoAfterErase(HeaderData& header, ProtoBStarPag
 
     if (combined.size() > static_cast<std::size_t>(2 * kMaxEntries + 1))
     {
-        return false;
+        return false; // Слишком много элементов для двух страниц
     }
 
     const int remaining = static_cast<int>(combined.size()) - 1;
     const int newLeftCount = remaining / 2;
     const int separatorIndex = newLeftCount;
 
+    // Перераспределение данных в left и right страницы (middle ликвидируется)
     replaceEntries(left, std::vector<ProtoIndexEntry>(combined.begin(), combined.begin() + newLeftCount));
     replaceEntries(right, std::vector<ProtoIndexEntry>(combined.begin() + separatorIndex + 1, combined.end()));
 
+    // Перенос всех дочерних указателей
     if (!middle.is_leaf())
     {
         std::vector<long long> combinedChildren;
@@ -768,6 +845,7 @@ bool DiskBStarIndex::mergeThreeToTwoAfterErase(HeaderData& header, ProtoBStarPag
         replaceChildren(right, std::vector<long long>(combinedChildren.begin() + newLeftCount + 1, combinedChildren.end()));
     }
 
+    // Корректировка родительского узла: один разделитель обновляется, второй удаляется
     std::vector<ProtoIndexEntry> parentEntries = pageEntries(parent);
     std::vector<long long> parentChildren = pageChildren(parent);
     parentEntries[childIndex - 1] = combined[separatorIndex];
@@ -778,15 +856,17 @@ bool DiskBStarIndex::mergeThreeToTwoAfterErase(HeaderData& header, ProtoBStarPag
 
     writePage(header, left);
     writePage(header, right);
-    freeOldPageSlot(header, middle.page_id());
+    freeOldPageSlot(header, middle.page_id()); // Освобождение дискового пространства удаленного узла
     return true;
 }
 
+// Классическое слияние 2-в-1: объединяет текущую страницу с левым или правым соседом
 bool DiskBStarIndex::mergeTwoToOneAfterErase(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     std::vector<ProtoIndexEntry> parentEntries = pageEntries(parent);
     std::vector<long long> parentChildren = pageChildren(parent);
 
+    // Случай А: Слияние с левым соседом
     if (childIndex > 0)
     {
         ProtoBStarPage left = readPage(header, parent.child_page_ids(childIndex - 1));
@@ -823,6 +903,7 @@ bool DiskBStarIndex::mergeTwoToOneAfterErase(HeaderData& header, ProtoBStarPage&
         return true;
     }
 
+    // Случай Б: Слияние с правым соседом
     if (childIndex + 1 < parent.child_page_ids_size())
     {
         ProtoBStarPage child = readPage(header, parent.child_page_ids(childIndex));
@@ -862,6 +943,7 @@ bool DiskBStarIndex::mergeTwoToOneAfterErase(HeaderData& header, ProtoBStarPage&
     return false;
 }
 
+// Восстанавливает минимальное заполнение дочернего узла после удаления элемента
 void DiskBStarIndex::repairChildAfterErase(HeaderData& header, ProtoBStarPage& parent, int childIndex)
 {
     if (childIndex < 0 || childIndex >= parent.child_page_ids_size())
@@ -874,15 +956,17 @@ void DiskBStarIndex::repairChildAfterErase(HeaderData& header, ProtoBStarPage& p
     writePage(header, child);
     if (child.entries_size() >= kMinEntries)
     {
-        return;
+        return; // Узел самодостаточен, балансировка не нужна
     }
 
+    // Каскад стратегий восстановления (заимствование -> слияние 3-в-2 -> слияние 2-в-1)
     if (borrowFromLeftAfterErase(header, parent, childIndex)) return;
     if (borrowFromRightAfterErase(header, parent, childIndex)) return;
     if (mergeThreeToTwoAfterErase(header, parent, childIndex)) return;
     mergeTwoToOneAfterErase(header, parent, childIndex);
 }
 
+// Корректирует или ликвидирует корень дерева, если он опустел после удаления
 void DiskBStarIndex::fixRootAfterErase(HeaderData& header)
 {
     if (!header.rootExists)
@@ -893,6 +977,7 @@ void DiskBStarIndex::fixRootAfterErase(HeaderData& header)
     ProtoBStarPage root = readPage(header, header.rootPageId);
     compactLeafTombstones(root);
 
+    // Корень является листом
     if (root.is_leaf())
     {
         if (root.entries_size() == 0)
@@ -909,6 +994,7 @@ void DiskBStarIndex::fixRootAfterErase(HeaderData& header)
         return;
     }
 
+    // Внутренний корень опустел — его единственный ребенок становится новым корнем
     if (root.entries_size() == 0 && root.child_page_ids_size() == 1)
     {
         const long long newRoot = root.child_page_ids(0);
@@ -921,11 +1007,13 @@ void DiskBStarIndex::fixRootAfterErase(HeaderData& header)
     writePage(header, root);
 }
 
+// Рекурсивная вставка элемента в узел, гарантированно защищенный от переполнения
 bool DiskBStarIndex::insertNonFull(HeaderData& header, long long pageId, const Value& key, std::streamoff offset)
 {
     ProtoBStarPage page = readPage(header, pageId);
     int position = findEntryPosition(page, key);
 
+    // Если ключ уже есть и он помечен как удаленный — реанимируем запись
     if (position < page.entries_size() && compareKeyWithEntry(key, page.entries(position)) == 0)
     {
         if (!page.entries(position).deleted())
@@ -937,6 +1025,7 @@ bool DiskBStarIndex::insertNonFull(HeaderData& header, long long pageId, const V
         return true;
     }
 
+    // Вставка непосредственно в лист
     if (page.is_leaf())
     {
         compactLeafTombstones(page);
@@ -948,11 +1037,13 @@ bool DiskBStarIndex::insertNonFull(HeaderData& header, long long pageId, const V
         return true;
     }
 
+    // Продвижение вниз: превентивно балансируем ребенка перед спуском
     prepareChildForInsert(header, page, position);
     writePage(header, page);
     page = readPage(header, pageId);
     position = findEntryPosition(page, key);
 
+    // Проверка: не стал ли ключ разделителем после балансировки
     if (position < page.entries_size() && compareKeyWithEntry(key, page.entries(position)) == 0)
     {
         if (!page.entries(position).deleted())
@@ -969,9 +1060,11 @@ bool DiskBStarIndex::insertNonFull(HeaderData& header, long long pageId, const V
         throw std::runtime_error("повреждена структура файлового B*-индекса: нет child после балансировки");
     }
 
+    // Рекурсивный спуск в подготовленный дочерний узел
     return insertNonFull(header, page.child_page_ids(position), key, offset);
 }
 
+// Публичный метод вставки: обрабатывает создание корня, сплит корня и запуск вставки
 bool DiskBStarIndex::insert(const Value& key, std::streamoff offset)
 {
     if (key.type == ValueType::Null || !valueHasColumnType(key, keyType_))
@@ -982,9 +1075,10 @@ bool DiskBStarIndex::insert(const Value& key, std::streamoff offset)
     HeaderData header = loadHeader();
     if (header.rootExists && contains(key))
     {
-        return false;
+        return false; // Дубликаты запрещены
     }
 
+    // Дерево пустое: инициализация первого корневого листа
     if (!header.rootExists)
     {
         ProtoBStarPage root = makePage(header, true);
@@ -997,6 +1091,7 @@ bool DiskBStarIndex::insert(const Value& key, std::streamoff offset)
         return true;
     }
 
+    // Если корень переполнен, увеличиваем высоту дерева (классический сплит корня)
     ProtoBStarPage root = readPage(header, header.rootPageId);
     compactLeafTombstones(root);
     if (root.entries_size() >= kMaxEntries)
@@ -1017,11 +1112,13 @@ bool DiskBStarIndex::insert(const Value& key, std::streamoff offset)
     return inserted;
 }
 
+// Рекурсивное удаление элемента из страницы (физическое в листах, логическое во внутренних)
 bool DiskBStarIndex::eraseInPage(HeaderData& header, long long pageId, const Value& key)
 {
     ProtoBStarPage page = readPage(header, pageId);
     const int position = findEntryPosition(page, key);
 
+    // Ключ найден на текущей странице
     if (position < page.entries_size() && compareKeyWithEntry(key, page.entries(position)) == 0)
     {
         if (page.entries(position).deleted())
@@ -1029,6 +1126,7 @@ bool DiskBStarIndex::eraseInPage(HeaderData& header, long long pageId, const Val
             return false;
         }
 
+        // Из листа удаляем физически
         if (page.is_leaf())
         {
             std::vector<ProtoIndexEntry> entries = pageEntries(page);
@@ -1038,6 +1136,7 @@ bool DiskBStarIndex::eraseInPage(HeaderData& header, long long pageId, const Val
             return true;
         }
 
+        // Из внутреннего узла удаляем логически (выставляем tombstone)
         ProtoIndexEntry entry = page.entries(position);
         entry.set_deleted(true);
         entry.set_offset(0);
@@ -1056,6 +1155,7 @@ bool DiskBStarIndex::eraseInPage(HeaderData& header, long long pageId, const Val
         return false;
     }
 
+    // Рекурсивный спуск с последующим восстановлением инварианта дерева на обратном пути
     const bool erased = eraseInPage(header, page.child_page_ids(position), key);
     if (erased)
     {
@@ -1066,7 +1166,7 @@ bool DiskBStarIndex::eraseInPage(HeaderData& header, long long pageId, const Val
     return erased;
 }
 
-
+// Публичный метод удаления: запускает процесс и обновляет метаданные
 bool DiskBStarIndex::erase(const Value& key)
 {
     HeaderData header = loadHeader();
@@ -1090,7 +1190,7 @@ bool DiskBStarIndex::erase(const Value& key)
     return erased;
 }
 
-
+// Рекурсивный обход дерева (In-Order) для сбора всех активных записей в один список
 void DiskBStarIndex::collectInOrder(const HeaderData& header, long long pageId, std::vector<ProtoIndexEntry>& entries) const
 {
     ProtoBStarPage page = readPage(header, pageId);
@@ -1125,6 +1225,7 @@ void DiskBStarIndex::collectInOrder(const HeaderData& header, long long pageId, 
     }
 }
 
+// Фильтрует плоский список записей по заданному диапазону (Low, High) и собирает смещения
 std::vector<std::streamoff> DiskBStarIndex::filterOffsets(
     const std::vector<ProtoIndexEntry>& entries,
     const Value& low,
@@ -1158,6 +1259,7 @@ std::vector<std::streamoff> DiskBStarIndex::filterOffsets(
     return offsets;
 }
 
+// Возвращает смещения для всех ключей, которые меньше заданного (ограничение сверху)
 std::vector<std::streamoff> DiskBStarIndex::lessThan(const Value& key, bool inclusive) const
 {
     HeaderData header = loadHeader();
@@ -1170,6 +1272,7 @@ std::vector<std::streamoff> DiskBStarIndex::lessThan(const Value& key, bool incl
     return filterOffsets(entries, dummy, false, key, true, false, inclusive);
 }
 
+// Возвращает смещения для всех ключей, которые больше заданного (ограничение снизу)
 std::vector<std::streamoff> DiskBStarIndex::greaterThan(const Value& key, bool inclusive) const
 {
     HeaderData header = loadHeader();
@@ -1182,6 +1285,7 @@ std::vector<std::streamoff> DiskBStarIndex::greaterThan(const Value& key, bool i
     return filterOffsets(entries, key, true, dummy, false, inclusive, false);
 }
 
+// Возвращает смещения для ключей, находящихся внутри замкнутого диапазона [low, high]
 std::vector<std::streamoff> DiskBStarIndex::between(const Value& low, const Value& high) const
 {
     HeaderData header = loadHeader();
@@ -1193,7 +1297,7 @@ std::vector<std::streamoff> DiskBStarIndex::between(const Value& low, const Valu
     return filterOffsets(entries, low, true, high, true, true, true);
 }
 
-// Useless:
+// Экспортирует базовые метаданные заголовка в строку Protobuf
 std::string DiskBStarIndex::exportTreeToProtoBytes() const
 {
     HeaderData header = loadHeader();
@@ -1207,6 +1311,7 @@ std::string DiskBStarIndex::exportTreeToProtoBytes() const
     return bytes;
 }
 
+// Заглушка для импорта дерева из Protobuf строки
 void DiskBStarIndex::importTreeFromProtoBytes(const std::string& bytes)
 {
     (void)bytes;

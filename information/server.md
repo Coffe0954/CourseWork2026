@@ -185,5 +185,31 @@ curl http://127.0.0.1:8080/metrics
 curl http://127.0.0.1:8080/heartbeat
 
 
+### Регистрация пользователя через администратора
+curl -X POST http://127.0.0.1:8080/register \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $(curl -s -X POST http://127.0.0.1:8080/login \
+    -H "Content-Type: application/json" \
+    -d '{"user":"admin","password":"admin"}' | jq -r '.result')" \
+  -d '{
+    "user": "ivan",
+    "password": "secret123",
+    "role": "writer"
+  }'
 
-...
+
+
+
+### Отправка 
+# Пример: выполнить SQL-запросы
+./course_client 127.0.0.1 8080 "
+  CREATE DATABASE university;
+  USE university;
+  CREATE TABLE students (
+    id INT INDEXED,
+    name STRING NOT_NULL,
+    age INT
+  );
+  INSERT INTO students (id, name, age) VALUES (1, 'Иван', 20);
+  SELECT * FROM students;
+" ivan secret123
